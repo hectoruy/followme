@@ -1,0 +1,35 @@
+name: iOS build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS (no codesign)
+    runs-on: macos-latest
+    defaults:
+      run:
+        # The Flutter app lives in the mauro_taxi/ subfolder of the repo.
+        working-directory: mauro_taxi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
