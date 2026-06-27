@@ -94,7 +94,7 @@ class _DetenerScreenState extends State<DetenerScreen>
     try {
       await Share.share(
         widget.shareLink,
-        subject: "Track my location — FollowMe",
+        subject: "Track my location — Where Is My Driver",
       );
     } catch (_) {}
   }

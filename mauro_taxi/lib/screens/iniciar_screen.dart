@@ -226,7 +226,7 @@ class _IniciarScreenState extends State<IniciarScreen>
 
   Future<void> _startForegroundService() async {
     await FlutterForegroundTask.startService(
-      notificationTitle: "📍 FollowMe",
+      notificationTitle: "📍 Where Is My Driver",
       notificationText: 'Sharing your location in real time...',
       callback: locationTaskCallback,
     );
@@ -410,7 +410,7 @@ class _IniciarScreenState extends State<IniciarScreen>
     try {
       await Share.share(
         link,
-        subject: "Track my location — FollowMe",
+        subject: "Track my location — Where Is My Driver",
       );
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: link));
@@ -735,7 +735,7 @@ class _IniciarScreenState extends State<IniciarScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                "FollowMe",
+                "Where Is My Driver",
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 18,
@@ -780,7 +780,7 @@ class _IniciarScreenState extends State<IniciarScreen>
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.hectoruy.followme',
+                  userAgentPackageName: 'com.hectoruy.whereismydriver',
                 ),
                 MarkerLayer(
                   markers: [
@@ -905,7 +905,7 @@ class _IniciarScreenState extends State<IniciarScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          "FollowMe",
+                          "Where Is My Driver",
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,

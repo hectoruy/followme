@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>FollowMe</string>
+	<string>Where Is My Driver</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -67,13 +67,13 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>FollowMe uses your location to share your real-time position with the people tracking you.</string>
+	<string>Where Is My Driver uses your location to share your real-time position with the people tracking you.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>FollowMe keeps sharing your location in the background so the people tracking you can see where you are until you stop sharing.</string>
+	<string>Where Is My Driver keeps sharing your location in the background so the people tracking you can see where you are until you stop sharing.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>FollowMe uses the camera to stream live video to the people tracking you.</string>
+	<string>Where Is My Driver uses the camera to stream live video to the people tracking you.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>FollowMe needs microphone access to start the live video stream.</string>
+	<string>Where Is My Driver needs microphone access to start the live video stream.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

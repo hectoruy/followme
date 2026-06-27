@@ -79,7 +79,7 @@ class LocationTaskHandler extends TaskHandler {
 
         // Keep notification text fresh so Android won't think the service stalled
         await FlutterForegroundTask.updateService(
-          notificationTitle: "📍 FollowMe",
+          notificationTitle: "📍 Where Is My Driver",
           notificationText: 'Sharing your location in real time...',
         );
 
