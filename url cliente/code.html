@@ -1,0 +1,212 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Mauro Lemes Trip - Real-Time Tracking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "secondary-fixed-dim": "#82d3de",
+                    "outline-variant": "#c2c6d1",
+                    "on-secondary-container": "#066f79",
+                    "tertiary-fixed-dim": "#ffb68d",
+                    "tertiary-fixed": "#ffdbc9",
+                    "surface-container-low": "#f2f4f6",
+                    "error-container": "#ffdad6",
+                    "surface-container-high": "#e6e8ea",
+                    "inverse-primary": "#a3c9ff",
+                    "outline": "#727781",
+                    "tertiary-container": "#7b3600",
+                    "surface-container": "#eceef0",
+                    "on-tertiary-container": "#ffa46e",
+                    "on-secondary-fixed-variant": "#004f56",
+                    "surface-container-highest": "#e0e3e5",
+                    "inverse-surface": "#2d3133",
+                    "on-primary-fixed-variant": "#004882",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-tint": "#27609d",
+                    "primary-fixed-dim": "#a3c9ff",
+                    "on-primary-container": "#8abcff",
+                    "tertiary": "#582500",
+                    "secondary-fixed": "#9ff0fb",
+                    "surface-dim": "#d8dadc",
+                    "on-surface": "#191c1e",
+                    "error": "#ba1a1a",
+                    "primary-container": "#004b87",
+                    "on-surface-variant": "#424750",
+                    "on-primary": "#ffffff",
+                    "on-tertiary-fixed": "#331200",
+                    "surface-variant": "#e0e3e5",
+                    "on-tertiary": "#ffffff",
+                    "on-background": "#191c1e",
+                    "on-primary-fixed": "#001c38",
+                    "on-error": "#ffffff",
+                    "surface": "#f7f9fb",
+                    "on-tertiary-fixed-variant": "#763300",
+                    "primary": "#003461",
+                    "surface-bright": "#f7f9fb",
+                    "secondary-container": "#9ff0fb",
+                    "primary-fixed": "#d3e4ff",
+                    "on-secondary-fixed": "#001f23",
+                    "secondary": "#006972",
+                    "background": "#f7f9fb",
+                    "inverse-on-surface": "#eff1f3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Plus Jakarta Sans"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .font-headline { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .map-container {
+            height: calc(100vh - 64px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+<div class="flex justify-between items-center h-16 px-6 w-full">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm" data-icon="explore" style="">explore</span>
+</div>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold text-lg tracking-tight text-blue-900 uppercase" style="">WHERE IS MY DRIVER?</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-container-high text-primary hover:bg-slate-100 transition-colors scale-95 active:scale-90 transition-transform duration-200" style="">
+<span class="material-symbols-outlined text-[20px]" data-icon="support_agent" style="">support_agent</span>
+<span class="text-xs font-bold font-headline" style=""><br></span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative mt-16 w-full map-container overflow-hidden bg-[#F0F2F5]">
+<!-- Full Screen Map (Simulated City Map of New York) -->
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-80" data-alt="Minimalist, clean aesthetic bird's-eye view map of New York City Manhattan grid" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmwHIsfN7i-R8_99OQJ497q09Cj4K8K8j-78P-M4G3K-r7H-A5I1Z4k5H8" style="">
+<!-- Animated Route Path -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 1000 1000">
+<path class="opacity-30" d="M300,700 L500,500 L700,300" fill="none" stroke="#003461" stroke-dasharray="8 8" stroke-linecap="round" stroke-width="4"></path>
+</svg>
+<!-- Destination Marker -->
+<div class="absolute top-[30%] left-[70%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+<div class="bg-white p-2 rounded-full shadow-lg border border-slate-200">
+<span class="material-symbols-outlined text-secondary" data-icon="location_on" style="font-variation-settings: &quot;FILL&quot; 1;">location_on</span>
+</div>
+<div class="mt-2 px-3 py-1 bg-white/90 backdrop-blur-md border border-slate-200 rounded-full shadow-sm">
+<p class="text-[10px] font-bold text-slate-800 uppercase tracking-widest" style="">Upper East Side</p>
+</div>
+</div>
+<!-- Live Driver Marker 'Mauro' -->
+<div class="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center">
+<div class="relative">
+<div class="absolute inset-0 bg-primary/20 rounded-full animate-ping"></div>
+<div class="relative bg-primary text-white p-2 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-white">
+<div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="directions_car" style="">directions_car</span>
+</div>
+<div class="pr-2">
+<p class="text-[9px] uppercase tracking-widest opacity-80 font-bold leading-none mb-1" style="">En camino</p>
+<p class="text-sm font-bold leading-tight font-headline" style="">Mauro Lemes</p>
+</div>
+</div>
+</div>
+<div class="w-3 h-3 bg-primary rotate-45 -mt-1.5 border-r-2 border-b-2 border-white"></div>
+</div>
+</div>
+<!-- Prominent Floating Stats Overlay -->
+<div class="absolute bottom-8 left-8 z-20 w-full max-w-sm">
+<div class="bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-[0px_24px_48px_rgba(0,52,97,0.12)] border border-white/50">
+<!-- ETA Banner -->
+<div class="mb-8 flex items-center justify-between">
+<div>
+<h2 class="text-slate-500 text-[10px] uppercase tracking-[0.2em] font-bold mb-2" style="">Arrival in</h2>
+<div class="flex items-baseline gap-2">
+<p class="text-blue-900 font-headline font-extrabold text-5xl" style="">12</p>
+<p class="text-blue-900 font-headline font-bold text-xl uppercase tracking-tighter" style="">mins</p>
+</div>
+</div>
+<div class="bg-secondary/10 px-4 py-2 rounded-2xl">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
+<p class="text-secondary font-bold text-xs uppercase tracking-widest" style="">In Transit</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-8">
+<!-- Stat 1 -->
+<div class="bg-surface-container-low/50 p-5 rounded-2xl">
+<p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1" style="">Time</p>
+<p class="text-blue-900 font-headline font-bold text-xl" style="">14:45</p>
+</div>
+<!-- Stat 2 -->
+<div class="bg-surface-container-low/50 p-5 rounded-2xl">
+<p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1" style="">Distance</p>
+<p class="text-blue-900 font-headline font-bold text-xl" style="">3.8 <span class="text-xs opacity-60" style="">km</span></p>
+</div>
+</div>
+<!-- Driver Identity Section -->
+<div class="pt-6 border-t border-slate-100 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-2xl bg-surface-container-highest overflow-hidden shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Mauro Lemes portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe1-LFl9d-0b4Vh5aDZgxyvmTU_MCE64hZV1XR8b9Jc-Sch6bsUMBoDTeU03RcVdloxEUyidx0AiVVhxO3hgyDsIXvXyBS0lzzbi9K8ZhypqgCkbxP8kQHrwUNUFv9SMnoeRSoGLNOwWd0xPONthbXFuUd-z--zKUb5noFU3lkrfRNO6Kv6CzZ4aF8T_a-65turLEUKUsUsDGwVNwy9m8VBJBhcSxrJBXN14Q93XxHqbUiJ8XeLKIxyMHwxvcZmQIjeNoRZHsexk8L" style="">
+</div>
+<div>
+<p class="text-slate-400 text-[9px] font-bold uppercase tracking-[0.15em]" style="">Private Driver</p>
+<p class="text-blue-900 font-headline font-bold text-base" style="">Mauro Lemes</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="w-11 h-11 flex items-center justify-center rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/80 transition-colors" style="">
+<span class="material-symbols-outlined" data-icon="call" style="">call</span>
+</button>
+<button class="w-11 h-11 flex items-center justify-center rounded-full bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 transition-colors" style="">
+<span class="material-symbols-outlined" data-icon="chat" style="">chat</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Minimal Zoom Controls -->
+<div class="absolute top-8 right-8 z-20 flex flex-col gap-3">
+<button class="w-11 h-11 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex items-center justify-center text-slate-700 hover:bg-white transition-all active:scale-95" style="">
+<span class="material-symbols-outlined" data-icon="add" style="">add</span>
+</button>
+<button class="w-11 h-11 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl flex items-center justify-center text-slate-700 hover:bg-white transition-all active:scale-95" style="">
+<span class="material-symbols-outlined" data-icon="remove" style="">remove</span>
+</button>
+<div class="h-2"></div>
+<button class="w-11 h-11 bg-primary text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-primary/90 transition-all active:scale-95" style="">
+<span class="material-symbols-outlined" data-icon="my_location" style="font-variation-settings: &quot;FILL&quot; 1;">my_location</span>
+</button>
+</div>
+<!-- Discreet Attribution -->
+<div class="absolute bottom-4 right-6 z-20">
+<p class="text-[10px] font-medium text-slate-400 bg-white/40 backdrop-blur-sm px-2 py-0.5 rounded" style="">© Horizon Ethos Travel • Signal Strong</p>
+</div>
+</main>
+</body></html>

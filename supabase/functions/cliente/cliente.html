@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Where's My Driver?</title>
+  <meta name="description" content="Track your driver's real-time location." />
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:   #06385f;
+      --secondary: #007c89;
+      --surface:   #f5f7f9;
+      --on-surface:#121820;
+      --outline:   #65717c;
+      --error:     #ba1a1a;
+      --green:     #059669;
+      --amber:     #d97706;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--surface);
+      color: var(--on-surface);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────── */
+    header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      height: 60px;
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(18,24,32,0.07);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-icon {
+      width: 34px; height: 34px;
+      background: var(--primary);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-icon svg { width: 19px; height: 19px; fill: white; }
+    .header-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800; font-size: 15px;
+      color: var(--primary); letter-spacing: 0;
+    }
+    .header-subtitle { font-size: 11px; color: var(--outline); margin-top: 1px; }
+
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(5,150,105,0.1);
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--green); border-radius: 50%;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:0.5; transform:scale(0.8); }
+    }
+    .live-text { font-size:11px; font-weight:700; color:var(--green); letter-spacing:1px; text-transform:uppercase; }
+
+    /* ── MAP ─────────────────────────────────────────────── */
+    #map {
+      flex:1;
+      margin-top:60px;
+      width:100%;
+      z-index:0;
+      background:#edf1f4;
+    }
+    .maplibregl-ctrl-bottom-right { margin-bottom: 8px; }
+
+    /* ── BOTTOM CARD ─────────────────────────────────────── */
+    .bottom-card {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 1000;
+      background: rgba(255,255,255,0.97);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-top-left-radius: 24px;
+      border-top-right-radius: 24px;
+      box-shadow: 0 -10px 30px rgba(6,56,95,0.12);
+      transition: transform 0.35s cubic-bezier(.4,0,.2,1), background 0.4s;
+      /* Full state */
+    }
+    .bottom-card.collapsed {
+      transform: translateY(calc(100% - 44px));
+    }
+    .bottom-card.alert {
+      background: rgba(255,247,230,0.98);
+    }
+
+    .card-inner { padding: 0 20px 28px; }
+
+    .card-handle-wrap {
+      height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      touch-action: none;
+    }
+    .card-handle {
+      width: 38px; height: 4px;
+      background: #e0e3e5; border-radius: 2px;
+    }
+
+    .eta-row {
+      display:flex; align-items:center;
+      justify-content:space-between; margin-bottom:14px;
+    }
+    .eta-label { font-size:10px; font-weight:800; color:var(--outline); text-transform:uppercase; letter-spacing:1.2px; }
+    .eta-value {
+      font-family:'Plus Jakarta Sans',sans-serif;
+      font-size:42px; font-weight:800; color:var(--primary); line-height:1;
+      transition: color 0.3s;
+    }
+    .eta-value.close { color: var(--amber); }
+    .eta-value.arrived { color: var(--green); }
+    .eta-unit { font-size:18px; font-weight:700; color:var(--primary); margin-left:4px; }
+    .distance-side {
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:8px;
+      position:relative;
+    }
+    .distance-unit-picker {
+      position:relative;
+      z-index:4;
+    }
+    .distance-unit-trigger {
+      border:none;
+      border-radius:999px;
+      background:#eef5f6;
+      color:var(--primary);
+      font-family:'Plus Jakarta Sans',sans-serif;
+      font-size:12px;
+      font-weight:800;
+      min-width:118px;
+      padding:8px 12px;
+      cursor:pointer;
+      box-shadow: inset 0 0 0 1px rgba(0,52,97,0.08), 0 6px 18px rgba(0,52,97,0.08);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      line-height:1;
+    }
+    .distance-unit-trigger:focus {
+      outline:2px solid rgba(0,105,114,0.22);
+      outline-offset:2px;
+    }
+    .distance-unit-chevron {
+      width:8px;
+      height:8px;
+      border-right:2px solid currentColor;
+      border-bottom:2px solid currentColor;
+      transform:rotate(45deg) translateY(-2px);
+      transition:transform 0.18s ease;
+      opacity:0.78;
+    }
+    .distance-unit-trigger[aria-expanded="true"] .distance-unit-chevron {
+      transform:rotate(225deg) translate(-2px,-1px);
+    }
+    .distance-unit-menu {
+      position:absolute;
+      bottom:calc(100% + 8px);
+      right:clamp(72px, 20vw, 104px);
+      min-width:178px;
+      max-width:calc(100vw - 40px);
+      padding:8px;
+      border-radius:18px;
+      background:rgba(255,255,255,0.98);
+      box-shadow:0 18px 36px rgba(0,52,97,0.18);
+      border:1px solid rgba(0,52,97,0.10);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      transform-origin:bottom right;
+      animation: unit-menu-in 0.16s ease;
+    }
+    .distance-unit-menu[hidden] { display:none; }
+    @keyframes unit-menu-in {
+      from { opacity:0; transform:translateY(4px) scale(0.98); }
+      to { opacity:1; transform:translateY(0) scale(1); }
+    }
+    .distance-unit-option {
+      border:none;
+      background:transparent;
+      border-radius:12px;
+      padding:10px 11px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      color:var(--primary);
+      font-family:'Plus Jakarta Sans',sans-serif;
+      text-align:left;
+    }
+    .distance-unit-option:hover,
+    .distance-unit-option.active {
+      background:#eef5f6;
+    }
+    .distance-unit-name {
+      font-size:13px;
+      font-weight:800;
+    }
+    .distance-unit-short {
+      font-size:11px;
+      font-weight:900;
+      color:var(--secondary);
+      background:rgba(0,105,114,0.10);
+      border-radius:999px;
+      padding:4px 7px;
+      min-width:34px;
+      text-align:center;
+    }
+
+    .stats-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;
+    }
+    .stat-box { background:#f1f5f7; border-radius:14px; padding:13px 15px; }
+    .stat-label { font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+    .stat-value { font-family:'Plus Jakarta Sans',sans-serif; font-size:20px; font-weight:700; color:var(--primary); }
+
+    /* ── APPROACHING BANNER ──────────────────────────────── */
+    #approach-banner {
+      display:none;
+      background: linear-gradient(135deg, #d97706, #b45309);
+      border-radius: 14px; padding: 12px 16px;
+      margin-bottom: 14px;
+      align-items:center; gap:10px;
+      animation: banner-in 0.4s ease;
+    }
+    #approach-banner.visible { display:flex; }
+    @keyframes banner-in {
+      from { opacity:0; transform:translateY(8px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    #approach-banner svg { width:22px; height:22px; fill:white; flex-shrink:0; }
+    .banner-text { font-weight:700; font-size:13px; color:white; }
+    .banner-sub  { font-size:11px; color:rgba(255,255,255,0.85); margin-top:2px; }
+
+    /* ── DRIVER ROW ──────────────────────────────────────── */
+    .driver-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding-top:14px; border-top:1px solid #f0f2f4;
+    }
+    .driver-info { display:flex; align-items:center; gap:12px; }
+    .driver-avatar {
+      width:46px; height:46px; background:var(--primary);
+      border-radius:16px; display:flex; align-items:center; justify-content:center;
+    }
+    .driver-avatar svg { width:26px; height:26px; fill:white; }
+    .driver-role { font-size:9px; font-weight:700; color:var(--outline); text-transform:uppercase; letter-spacing:1.5px; }
+    .driver-name { font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:17px; color:var(--primary); }
+
+    .action-btns { display:flex; gap:8px; }
+    .action-btn {
+      width:44px; height:44px; border:none; border-radius:50%;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      transition:transform 0.15s, opacity 0.15s; text-decoration:none;
+    }
+    .action-btn:active { transform:scale(0.92); }
+    .btn-call  { background:rgba(0,52,97,0.1); }
+    .btn-call svg { fill:var(--primary); }
+    .btn-sms   { background:rgba(5,150,105,0.1); }
+    .btn-sms svg { fill:var(--green); }
+    .action-btn svg { width:22px; height:22px; }
+
+    /* ── MY LOCATION FAB ─────────────────────────────────── */
+    .map-control-stack {
+      position: fixed;
+      right: 16px;
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .zoom-stack {
+      top: 104px;
+      left: 16px;
+      right: auto;
+    }
+    .action-stack {
+      top: 104px;
+    }
+    .map-control-btn {
+      width: 46px; height: 46px;
+      background: white;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 22px rgba(6,56,95,0.16);
+      border: 1px solid rgba(6,56,95,0.10);
+      transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
+      color: var(--primary);
+      font-family:'Plus Jakarta Sans',sans-serif;
+      font-size:24px;
+      font-weight:800;
+      line-height:1;
+    }
+    .map-control-btn:active { transform: scale(0.92); }
+    .map-control-btn svg { width:22px; height:22px; fill:var(--primary); transition: fill 0.2s, transform 0.2s; }
+    #my-location-btn.active { background: var(--primary); }
+    #my-location-btn.active svg { fill: white; }
+    .driver-control.ready {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 10px 26px rgba(6,56,95,0.26);
+    }
+    .driver-control.ready svg { fill: white; }
+    #compass-needle { transform-origin: 12px 12px; }
+
+    .video-pip {
+      display: none;
+      position: absolute;
+      bottom: 74px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 156px;
+      max-width: 42vw;
+      aspect-ratio: 16 / 10;
+      z-index: 12;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #111827;
+      border: 2px solid rgba(255,255,255,0.95);
+      box-shadow: 0 10px 28px rgba(0,52,97,0.28);
+      pointer-events: auto;
+      transition: width 0.22s ease, bottom 0.22s ease, border-radius 0.22s ease;
+    }
+    .video-pip.visible { display: block; }
+    .video-pip.expanded {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      width: 100dvw;
+      max-width: none;
+      height: 100vh;
+      height: 100dvh;
+      aspect-ratio: auto;
+      transform: none;
+      border-radius: 0;
+      border: 0;
+      z-index: 20000;
+      box-shadow: none;
+    }
+    .video-pip video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #111827;
+    }
+    .video-chip {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(186,26,26,0.92);
+      color: white;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .video-actions {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      display: flex;
+      gap: 6px;
+      z-index: 3;
+    }
+    .video-action-btn {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(17,24,39,0.72);
+      color: white;
+      cursor: pointer;
+      padding: 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.24);
+    }
+    .video-action-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    .video-pip.expanded .video-actions {
+      top: calc(env(safe-area-inset-top, 0px) + 14px);
+      right: calc(env(safe-area-inset-right, 0px) + 14px);
+      gap: 10px;
+    }
+    .video-pip.expanded .video-action-btn {
+      width: 42px;
+      height: 42px;
+      background: rgba(17,24,39,0.78);
+    }
+    .video-pip.expanded .video-action-btn svg {
+      width: 22px;
+      height: 22px;
+    }
+    .video-chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: white;
+      animation: pulse-dot 1.2s ease-in-out infinite;
+    }
+    .video-status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      text-align: center;
+      color: rgba(255,255,255,0.82);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.35;
+      background: linear-gradient(135deg, #111827, #003461);
+    }
+    .video-status.hidden { display: none; }
+
+    @media (min-width: 720px) {
+      .video-pip {
+        bottom: 82px;
+        width: 206px;
+      }
+    }
+
+    /* ── STOPPED OVERLAY ─────────────────────────────────── */
+    #stopped-overlay {
+      display:none; position:fixed; inset:0; z-index:5000;
+      background:rgba(247,249,251,0.97); backdrop-filter:blur(20px);
+      flex-direction:column; align-items:center; justify-content:center;
+      padding:40px 32px; text-align:center;
+    }
+    #stopped-overlay.visible { display:flex; }
+    .stopped-icon {
+      width:100px; height:100px;
+      background:rgba(186,26,26,0.08); border-radius:50%;
+      display:flex; align-items:center; justify-content:center; margin-bottom:28px;
+    }
+    .stopped-icon svg { width:56px; height:56px; fill:var(--error); }
+    .stopped-title { font-family:'Plus Jakarta Sans',sans-serif; font-size:26px; font-weight:800; color:var(--on-surface); margin-bottom:12px; }
+    .stopped-sub   { font-size:15px; color:var(--outline); line-height:1.5; max-width:280px; }
+    .stopped-badge { margin-top:32px; display:flex; align-items:center; gap:8px; background:rgba(186,26,26,0.08); padding:10px 20px; border-radius:24px; }
+    .stopped-badge-dot  { width:8px; height:8px; background:var(--error); border-radius:50%; }
+    .stopped-badge-text { font-size:12px; font-weight:700; color:var(--error); letter-spacing:1px; text-transform:uppercase; }
+
+    /* ── SHARE DIALOG ────────────────────────────────────── */
+    #share-modal {
+      display: none; position: fixed; inset: 0; z-index: 9500;
+      background: rgba(0,0,0,0.45); backdrop-filter: blur(6px);
+      align-items: flex-end; justify-content: center;
+    }
+    #share-modal.visible { display: flex; }
+    .share-sheet {
+      background: white;
+      border-radius: 28px 28px 0 0;
+      padding: 8px 24px 40px;
+      width: 100%; max-width: 520px;
+      animation: sheet-in 0.32s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes sheet-in {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+    .share-handle {
+      width: 40px; height: 4px; background: #e0e3e5;
+      border-radius: 2px; margin: 12px auto 20px;
+    }
+    .share-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16px; font-weight: 800; color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .share-subtitle { font-size: 13px; color: var(--outline); margin-bottom: 20px; }
+    .share-link-box {
+      background: #f2f4f6; border-radius: 14px;
+      padding: 12px 14px; margin-bottom: 20px;
+      font-size: 12px; color: var(--primary); font-weight: 600;
+      word-break: break-all; line-height: 1.5;
+    }
+    .share-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .share-app {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      cursor: pointer; text-decoration: none;
+    }
+    .share-app-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s;
+    }
+    .share-app:active .share-app-icon { transform: scale(0.90); }
+    .share-app-icon svg { width: 28px; height: 28px; }
+    .share-app-label { font-size: 11px; font-weight: 600; color: var(--on-surface); text-align: center; }
+    .share-copy-btn {
+      width: 100%; padding: 14px; border: none; border-radius: 16px;
+      background: var(--primary); color: white;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.2s;
+    }
+    .share-copy-btn:active { opacity: 0.85; }
+    .share-copy-btn svg { width: 18px; height: 18px; fill: white; }
+
+    /* ── LOADING / ERROR ─────────────────────────────────── */
+    #loading-overlay {
+      position:fixed; inset:0; z-index:9000;
+      background: var(--primary);
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+    }
+    .loader-taxi {
+      font-size: 52px;
+      animation: taxi-bounce 1s ease-in-out infinite;
+    }
+    @keyframes taxi-bounce {
+      0%,100% { transform: translateY(0) rotate(-4deg); }
+      50%      { transform: translateY(-12px) rotate(4deg); }
+    }
+    .loader-ring {
+      width: 56px; height: 56px;
+      border: 4px solid rgba(255,255,255,0.25);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-text { font-size:15px; color:rgba(255,255,255,0.85); font-weight:600; letter-spacing: 0.3px; }
+    .loading-sub  { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: -16px; }
+
+    #error-overlay {
+      display:none; position:fixed; inset:0; z-index:9000;
+      background:var(--surface);
+      flex-direction:column; align-items:center; justify-content:center;
+      padding:40px; text-align:center; gap:16px;
+    }
+    #error-overlay.visible { display:flex; }
+    .error-title { font-family:'Plus Jakarta Sans',sans-serif; font-size:22px; font-weight:800; color:var(--error); }
+    .error-msg   { font-size:14px; color:var(--outline); max-width:280px; line-height:1.5; }
+
+    /* ── LEAFLET MARKERS ─────────────────────────────────── */
+    .taxi-marker-wrapper {
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      pointer-events:none;
+    }
+    .taxi-marker-bubble {
+      background:var(--primary); color:white;
+      padding:6px 12px; border-radius:12px;
+      font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:12px;
+      display:flex; align-items:center; gap:6px;
+      box-shadow:0 8px 22px rgba(0,52,97,0.24); border:2px solid white;
+      white-space:nowrap; animation:marker-bounce 2s ease-in-out infinite;
+    }
+    .taxi-marker-bubble.client {
+      background:var(--green);
+      box-shadow:0 8px 22px rgba(5,150,105,0.26);
+    }
+    @keyframes marker-bounce {
+      0%,100% { transform:translateY(0); }
+      50% { transform:translateY(-4px); }
+    }
+    .taxi-marker-arrow {
+      width:0; height:0;
+      border-left:8px solid transparent; border-right:8px solid transparent;
+      border-top:10px solid var(--primary); margin-top:-1px;
+    }
+    .taxi-ping {
+      position:absolute; width:40px; height:40px; border-radius:50%;
+      background:rgba(0,52,97,0.2); animation:ping 2s ease-out infinite;
+      top:50%; left:50%; transform:translate(-50%,-50%);
+    }
+    .taxi-ping.client { background:rgba(5,150,105,0.2); }
+    @keyframes ping {
+      0%  { transform:translate(-50%,-50%) scale(0.5); opacity:1; }
+      100%{ transform:translate(-50%,-50%) scale(2.5); opacity:0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="loader-taxi">🚕</div>
+  <div class="loader-ring"></div>
+  <p class="loading-text">Connecting to your driver...</p>
+  <p class="loading-sub">Fetching real-time location</p>
+</div>
+
+<!-- Error -->
+<div id="error-overlay">
+  <div style="font-size:48px;">🚕</div>
+  <p class="error-title">Invalid link</p>
+  <p class="error-msg" id="error-msg-text">This link doesn't exist or has expired. Ask your driver for a new one.</p>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+    </div>
+    <div>
+      <div class="header-title">Where's My Driver?</div>
+    </div>
+  </div>
+  <div class="live-badge" id="live-badge">
+    <div class="live-dot"></div>
+    <span class="live-text">Live</span>
+  </div>
+</header>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- Map controls -->
+<div class="map-control-stack zoom-stack" aria-label="Map zoom controls">
+  <button id="zoom-in-btn" class="map-control-btn" title="Zoom in" aria-label="Zoom in">+</button>
+  <button id="zoom-out-btn" class="map-control-btn" title="Zoom out" aria-label="Zoom out">-</button>
+</div>
+<div class="map-control-stack action-stack" aria-label="Map location controls">
+  <button id="my-location-btn" class="map-control-btn" title="My location" aria-label="Go to my location">
+    <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+  </button>
+  <button id="driver-location-btn" class="map-control-btn driver-control" title="Driver location" aria-label="Go to driver location">
+    <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16C5.67 16 5 15.33 5 14.5S5.67 13 6.5 13 8 13.67 8 14.5 7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5S16.67 13 17.5 13s1.5.67 1.5 1.5S18.33 16 17.5 16zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+  </button>
+  <button id="compass-btn" class="map-control-btn" title="Reset north" aria-label="Reset map north">
+    <svg id="compass-needle" viewBox="0 0 24 24"><path d="M12 2 5.5 21 12 17.8 18.5 21 12 2zm0 6.4 2.7 7.9-2.7-1.3-2.7 1.3L12 8.4z"/></svg>
+  </button>
+</div>
+
+<!-- LIVE VIDEO -->
+<div id="video-pip" class="video-pip" aria-label="Driver live camera">
+  <video id="live-video" autoplay playsinline muted></video>
+  <div class="video-actions" aria-label="Video controls">
+    <button id="video-expand-btn" class="video-action-btn" type="button" title="Expand video" aria-label="Expand video">
+      <svg viewBox="0 0 24 24"><path d="M5 5h6v2H7v4H5V5zm8 0h6v6h-2V7h-4V5zM7 13v4h4v2H5v-6h2zm10 4v-4h2v6h-6v-2h4z"/></svg>
+    </button>
+    <button id="video-close-btn" class="video-action-btn" type="button" title="Close video" aria-label="Close video">
+      <svg viewBox="0 0 24 24"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.41L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.3-6.3 1.41 1.42z"/></svg>
+    </button>
+  </div>
+  <div class="video-chip">
+    <span class="video-chip-dot"></span>
+    LIVE
+  </div>
+  <div id="video-status" class="video-status">Connecting camera...</div>
+</div>
+
+<!-- BOTTOM CARD -->
+<div class="bottom-card" id="bottom-card">
+  <div class="card-handle-wrap" id="card-handle-wrap">
+    <div class="card-handle"></div>
+  </div>
+  <div class="card-inner">
+    <!-- Distance -->
+    <div class="eta-row">
+      <div>
+        <div class="eta-label">Distance</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px;">
+          <span class="eta-value" id="dist-value">--</span>
+          <span class="eta-unit" id="dist-unit">m</span>
+        </div>
+      </div>
+      <div class="distance-side">
+        <div class="distance-unit-picker" id="distance-unit-picker">
+          <button id="distance-unit-button" class="distance-unit-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="distance-unit-current">Meters</span>
+            <span class="distance-unit-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="distance-unit-menu" class="distance-unit-menu" role="listbox" aria-label="Distance unit" hidden>
+            <button class="distance-unit-option" type="button" role="option" data-unit="meters">
+              <span class="distance-unit-name">Meters</span>
+              <span class="distance-unit-short">m</span>
+            </button>
+            <button class="distance-unit-option" type="button" role="option" data-unit="kilometers">
+              <span class="distance-unit-name">Kilometers</span>
+              <span class="distance-unit-short">km</span>
+            </button>
+            <button class="distance-unit-option" type="button" role="option" data-unit="yards">
+              <span class="distance-unit-name">Yards</span>
+              <span class="distance-unit-short">yd</span>
+            </button>
+            <button class="distance-unit-option" type="button" role="option" data-unit="feet">
+              <span class="distance-unit-name">Feet</span>
+              <span class="distance-unit-short">ft</span>
+            </button>
+            <button class="distance-unit-option" type="button" role="option" data-unit="miles">
+              <span class="distance-unit-name">Miles</span>
+              <span class="distance-unit-short">mi</span>
+            </button>
+          </div>
+        </div>
+        <div class="live-badge">
+          <div class="live-dot"></div>
+          <span class="live-text">Live</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Approaching banner (shown at ≤100 m) -->
+    <div id="approach-banner">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      <div>
+        <div class="banner-text">Almost there</div>
+        <div class="banner-sub" id="banner-dist">Driver is approaching</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Updated</div>
+        <div class="stat-value" id="last-update">--</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Trip</div>
+        <div class="stat-value" style="font-size:14px;color:var(--green);" id="status-text">Connecting...</div>
+      </div>
+    </div>
+
+    <!-- Driver info -->
+    <div class="driver-row">
+      <div class="driver-info">
+        <div class="driver-avatar">
+          <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+        <div>
+          <div class="driver-role">Driver</div>
+          <div class="driver-name" id="driver-name-el">Loading...</div>
+        </div>
+      </div>
+      <div class="action-btns">
+        <a href="#" id="btn-call" class="action-btn btn-call" title="Call driver">
+          <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        </a>
+        <a href="#" id="btn-sms" class="action-btn btn-sms" title="Send SMS">
+          <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12zM7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div id="share-modal" role="dialog" aria-modal="true" aria-label="Share location link">
+  <div class="share-sheet" id="share-sheet">
+    <div class="share-handle"></div>
+    <div class="share-title">Link Copied ✓</div>
+    <div class="share-subtitle">Choose where to share your location</div>
+    <div class="share-link-box" id="share-link-display"></div>
+
+    <!-- Quick share apps -->
+    <div class="share-grid" id="share-grid">
+      <!-- filled dynamically -->
+    </div>
+
+    <!-- Copy button -->
+    <button class="share-copy-btn" id="share-copy-btn">
+      <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+      Copy Link
+    </button>
+  </div>
+</div>
+
+<!-- STOPPED OVERLAY -->
+<div id="stopped-overlay">
+  <div class="stopped-icon">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+  </div>
+  <p class="stopped-title">Location sharing stopped</p>
+  <p class="stopped-sub">Your driver ended the trip. This link is no longer available.</p>
+  <div class="stopped-badge">
+    <div class="stopped-badge-dot"></div>
+    <span class="stopped-badge-text">Session ended</span>
+  </div>
+  <div style="margin-top:32px;display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px;">
+    <a href="#" id="stopped-call" style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--primary);color:white;text-decoration:none;padding:14px;border-radius:16px;font-weight:700;font-size:15px;">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:white;"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+      Call Driver
+    </a>
+    <a href="#" id="stopped-sms" style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--green);color:white;text-decoration:none;padding:14px;border-radius:16px;font-weight:700;font-size:15px;">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:white;"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12zM7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg>
+      Send SMS
+    </a>
+  </div>
+</div>
+
+<script>
+  window.WMD_CONFIG = window.WMD_CONFIG || {};
+  const SUPABASE_URL = window.WMD_CONFIG.SUPABASE_URL || 'https://hoczdolplvaiupcqlmgv.supabase.co';
+  const SUPABASE_KEY = window.WMD_CONFIG.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvY3pkb2xwbHZhaXVwY3FsbWd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDY2NzcsImV4cCI6MjA5NDI4MjY3N30.8PiSDBCbmEDOChOSY1GSXD-llASolQ67Zg6QTJaO2U0';
+  const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
+  const MAP_CAMERA = { zoom: 12.5, focusZoom: 13.2, pitch: 0, bearing: 0 };
+  const LIVEKIT_CLIENT_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.15.7/dist/livekit-client.esm.mjs';
+  const DISTANCE_UNIT_KEY = 'wmd_distance_unit';
+  const DISTANCE_UNITS = {
+    meters: { name: 'Meters', label: 'm', factor: 1, decimals: 0 },
+    kilometers: { name: 'Kilometers', label: 'km', factor: 0.001, decimals: 1 },
+    yards: { name: 'Yards', label: 'yd', factor: 1.0936133, decimals: 0 },
+    feet: { name: 'Feet', label: 'ft', factor: 3.2808399, decimals: 0 },
+    miles: { name: 'Miles', label: 'mi', factor: 0.000621371, decimals: 2 },
+  };
+
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('id');
+  const pageUrl   = window.location.href;
+
+  const loadingEl  = document.getElementById('loading-overlay');
+  const errorEl    = document.getElementById('error-overlay');
+  const stoppedEl  = document.getElementById('stopped-overlay');
+  const bannerEl   = document.getElementById('approach-banner');
+  const bannerDist = document.getElementById('banner-dist');
+  const distValue  = document.getElementById('dist-value');
+  const distUnit   = document.getElementById('dist-unit');
+  const distanceUnitPicker = document.getElementById('distance-unit-picker');
+  const distanceUnitButton = document.getElementById('distance-unit-button');
+  const distanceUnitCurrent = document.getElementById('distance-unit-current');
+  const distanceUnitMenu = document.getElementById('distance-unit-menu');
+  const distanceUnitOptions = Array.from(document.querySelectorAll('.distance-unit-option'));
+  const bottomCard = document.getElementById('bottom-card');
+  const handleWrap = document.getElementById('card-handle-wrap');
+  const shareModal = document.getElementById('share-modal');
+  const zoomInBtn = document.getElementById('zoom-in-btn');
+  const zoomOutBtn = document.getElementById('zoom-out-btn');
+  const compassBtn = document.getElementById('compass-btn');
+  const compassNeedle = document.getElementById('compass-needle');
+  const myLocBtn   = document.getElementById('my-location-btn');
+  const driverLocBtn = document.getElementById('driver-location-btn');
+  const videoPip = document.getElementById('video-pip');
+  const liveVideoEl = document.getElementById('live-video');
+  const videoStatusEl = document.getElementById('video-status');
+  const videoExpandBtn = document.getElementById('video-expand-btn');
+  const videoCloseBtn = document.getElementById('video-close-btn');
+
+  let mapInstance, driverMarker, clientMarker, driverMarkerEl;
+  let livekitRoom = null;
+  let livekitVideoTrack = null;
+  let liveVideoDismissed = false;
+  let clientLat = null, clientLng = null;
+  let driverLat = null, driverLng = null;
+  let prevDist = null;
+  let notifSent = false;
+  let driverPhone = '';
+  let followClient = false;  // whether map tracks client position
+  let cardCollapsed = false;
+  let selectedDistanceUnit = getStoredDistanceUnit();
+  renderDistanceUnitPicker();
+
+  distanceUnitButton.addEventListener('click', () => {
+    setDistanceUnitMenuOpen(distanceUnitMenu.hidden);
+  });
+
+  distanceUnitOptions.forEach(option => {
+    option.addEventListener('click', () => {
+      setDistanceUnit(option.dataset.unit);
+      setDistanceUnitMenuOpen(false);
+    });
+  });
+
+  document.addEventListener('click', event => {
+    if (!distanceUnitPicker.contains(event.target)) {
+      setDistanceUnitMenuOpen(false);
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') setDistanceUnitMenuOpen(false);
+  });
+
+  function getStoredDistanceUnit() {
+    try {
+      const storedUnit = localStorage.getItem(DISTANCE_UNIT_KEY);
+      if (DISTANCE_UNITS[storedUnit]) return storedUnit;
+    } catch (_) {}
+    return 'meters';
+  }
+
+  function setDistanceUnitMenuOpen(open) {
+    distanceUnitMenu.hidden = !open;
+    distanceUnitButton.setAttribute('aria-expanded', String(open));
+  }
+
+  function setDistanceUnit(unit) {
+    if (!DISTANCE_UNITS[unit]) return;
+    selectedDistanceUnit = unit;
+    try {
+      localStorage.setItem(DISTANCE_UNIT_KEY, unit);
+    } catch (_) {}
+    renderDistanceUnitPicker();
+    updateDistance();
+  }
+
+  function renderDistanceUnitPicker() {
+    const selected = DISTANCE_UNITS[selectedDistanceUnit] || DISTANCE_UNITS.meters;
+    distanceUnitCurrent.textContent = selected.name;
+    distanceUnitOptions.forEach(option => {
+      const isActive = option.dataset.unit === selectedDistanceUnit;
+      option.classList.toggle('active', isActive);
+      option.setAttribute('aria-selected', String(isActive));
+    });
+  }
+
+  function formatDistance(meters) {
+    const config = DISTANCE_UNITS[selectedDistanceUnit] || DISTANCE_UNITS.meters;
+    const converted = meters * config.factor;
+    return {
+      value: config.decimals === 0
+        ? String(Math.round(converted))
+        : converted.toFixed(config.decimals),
+      unit: config.label,
+    };
+  }
+
+  function formatDistanceText(meters) {
+    const formatted = formatDistance(meters);
+    return `${formatted.value} ${formatted.unit}`;
+  }
+
+  /* ── BOTTOM CARD COLLAPSE ─────────────────────────────── */
+  function collapseCard() {
+    cardCollapsed = true;
+    bottomCard.classList.add('collapsed');
+  }
+  function expandCard() {
+    cardCollapsed = false;
+    bottomCard.classList.remove('collapsed');
+  }
+
+  handleWrap.addEventListener('click', () => {
+    if (cardCollapsed) expandCard(); else collapseCard();
+  });
+
+  // Touch-drag to collapse/expand the card
+  let dragStartY = 0;
+  handleWrap.addEventListener('touchstart', e => { dragStartY = e.touches[0].clientY; }, { passive: true });
+  handleWrap.addEventListener('touchend', e => {
+    const dy = e.changedTouches[0].clientY - dragStartY;
+    if (dy > 30) collapseCard();
+    else if (dy < -30) expandCard();
+  });
+
+  // Tap map → collapse sheet
+  document.getElementById('map').addEventListener('click', () => {
+    if (!cardCollapsed) collapseCard();
+  });
+
+  function collapseCardForMapControl() {
+    if (!cardCollapsed) collapseCard();
+  }
+
+  function mapFocusPadding() {
+    return { top: 88, right: 76, bottom: 76, left: 76 };
+  }
+
+  function centerMapOnTrip({ resetBearing = false } = {}) {
+    if (!mapInstance) return;
+
+    const baseOptions = {
+      duration: 650,
+      pitch: 0,
+    };
+    if (resetBearing) baseOptions.bearing = 0;
+
+    const hasDriver = hasValidPosition(driverLat, driverLng);
+    const hasClient = hasValidPosition(clientLat, clientLng);
+
+    if (hasDriver && hasClient) {
+      const bounds = new maplibregl.LngLatBounds([driverLng, driverLat], [driverLng, driverLat]);
+      bounds.extend([clientLng, clientLat]);
+      mapInstance.fitBounds(bounds, {
+        ...baseOptions,
+        padding: mapFocusPadding(),
+        maxZoom: MAP_CAMERA.focusZoom,
+      });
+      return;
+    }
+
+    if (hasDriver || hasClient) {
+      const center = hasDriver ? [driverLng, driverLat] : [clientLng, clientLat];
+      mapInstance.easeTo({
+        ...baseOptions,
+        center,
+        zoom: MAP_CAMERA.focusZoom,
+      });
+      return;
+    }
+
+    if (resetBearing) mapInstance.easeTo(baseOptions);
+  }
+
+  /* ── MY LOCATION BUTTON ───────────────────────────────── */
+  zoomInBtn.addEventListener('click', () => {
+    collapseCardForMapControl();
+    if (!mapInstance) return;
+    mapInstance.easeTo({
+      zoom: mapInstance.getZoom() + 1,
+      duration: 250,
+      pitch: 0,
+    });
+  });
+
+  zoomOutBtn.addEventListener('click', () => {
+    collapseCardForMapControl();
+    if (!mapInstance) return;
+    mapInstance.easeTo({
+      zoom: mapInstance.getZoom() - 1,
+      duration: 250,
+      pitch: 0,
+    });
+  });
+
+  myLocBtn.addEventListener('click', () => {
+    collapseCardForMapControl();
+    followClient = !followClient;
+    myLocBtn.classList.toggle('active', followClient);
+    if (followClient && clientLat !== null && mapInstance) {
+      mapInstance.easeTo({
+        center: [clientLng, clientLat],
+        zoom: MAP_CAMERA.focusZoom,
+        duration: 650,
+        pitch: 0,
+      });
+    }
+  });
+
+  compassBtn.addEventListener('click', () => {
+    collapseCardForMapControl();
+    followClient = false;
+    myLocBtn.classList.remove('active');
+    centerMapOnTrip({ resetBearing: true });
+  });
+
+  driverLocBtn.addEventListener('click', () => {
+    collapseCardForMapControl();
+    if (!mapInstance || !hasValidPosition(driverLat, driverLng)) return;
+    followClient = false;
+    myLocBtn.classList.remove('active');
+    mapInstance.easeTo({
+      center: [driverLng, driverLat],
+      zoom: MAP_CAMERA.focusZoom,
+      duration: 650,
+      pitch: 0,
+    });
+  });
+
+  function updateCompass() {
+    if (!mapInstance) return;
+    const bearing = mapInstance.getBearing();
+    compassNeedle.style.transform = `rotate(${-bearing}deg)`;
+  }
+
+  // Disable follow if user moves map manually
+  function onMapMove() {
+    // only turn off if movement wasn't from us
+  }
+
+  /* ── SHARE MODAL (Web Share API → custom sheet fallback) ─ */
+  function buildShareGrid(url) {
+    const apps = [
+      { label: 'WhatsApp', color: '#25D366', href: `https://wa.me/?text=${encodeURIComponent(url)}`,
+        icon: `<svg viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>` },
+      { label: 'Telegram', color: '#229ED9', href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent("Track my driver's location")}`,
+        icon: `<svg viewBox="0 0 24 24" fill="white"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>` },
+      { label: 'SMS', color: '#059669', href: `sms:?body=${encodeURIComponent(url)}`,
+        icon: `<svg viewBox="0 0 24 24" fill="white"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>` },
+      { label: 'More', color: '#6B7280', href: null,
+        icon: `<svg viewBox="0 0 24 24" fill="white"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>` },
+    ];
+    const grid = document.getElementById('share-grid');
+    grid.innerHTML = '';
+    apps.forEach(app => {
+      const a = document.createElement('a');
+      a.className = 'share-app';
+      if (app.href) { a.href = app.href; a.target = '_blank'; a.rel = 'noopener'; }
+      else {
+        a.href = '#';
+        a.addEventListener('click', e => { e.preventDefault(); nativeShare(url); });
+      }
+      a.innerHTML = `
+        <div class="share-app-icon" style="background:${app.color};">${app.icon}</div>
+        <span class="share-app-label">${app.label}</span>`;
+      if (app.href) a.addEventListener('click', () => closeShareModal());
+      grid.appendChild(a);
+    });
+  }
+
+  function nativeShare(url) {
+    if (navigator.share) {
+      navigator.share({ title: "Where's My Driver?", text: "Track my driver's location", url })
+        .catch(() => {});
+    }
+    closeShareModal();
+  }
+
+  function showShareModal(url) {
+    document.getElementById('share-link-display').textContent = url;
+    buildShareGrid(url);
+    shareModal.classList.add('visible');
+    document.getElementById('share-copy-btn').textContent = 'Copy Link';
+    document.getElementById('share-copy-btn').prepend((() => {
+      const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      s.setAttribute('viewBox','0 0 24 24');
+      s.style.cssText = 'width:18px;height:18px;fill:white;flex-shrink:0;';
+      s.innerHTML = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+      return s;
+    })());
+  }
+
+  function closeShareModal() {
+    shareModal.classList.remove('visible');
+  }
+
+  shareModal.addEventListener('click', e => {
+    if (e.target === shareModal) closeShareModal();
+  });
+
+  document.getElementById('share-copy-btn').addEventListener('click', () => {
+    const url = document.getElementById('share-link-display').textContent;
+    navigator.clipboard.writeText(url).then(() => {
+      document.getElementById('share-copy-btn').textContent = '✓ Copied!';
+      setTimeout(closeShareModal, 1200);
+    }).catch(() => {});
+  });
+
+  /* ── WEB AUDIO CHIME ──────────────────────────────────── */
+  function playChime() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [523, 659, 784].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.18);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.4);
+        osc.start(ctx.currentTime + i * 0.18);
+        osc.stop(ctx.currentTime + i * 0.18 + 0.4);
+      });
+    } catch(_) {}
+  }
+
+  function requestBrowserNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  function showBrowserNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '' });
+    }
+  }
+
+  function setVideoExpanded(expanded) {
+    if (expanded) {
+      if (videoPip.parentElement !== document.body) {
+        document.body.appendChild(videoPip);
+      }
+      videoPip.classList.add('expanded');
+    } else {
+      videoPip.classList.remove('expanded');
+      attachLiveVideoToDriverMarker();
+    }
+    videoExpandBtn.title = expanded ? 'Shrink video' : 'Expand video';
+    videoExpandBtn.setAttribute(
+      'aria-label',
+      expanded ? 'Shrink video' : 'Expand video',
+    );
+  }
+
+  videoExpandBtn.addEventListener('click', event => {
+    event.stopPropagation();
+    setVideoExpanded(!videoPip.classList.contains('expanded'));
+  });
+
+  videoCloseBtn.addEventListener('click', event => {
+    event.stopPropagation();
+    liveVideoDismissed = true;
+    setVideoExpanded(false);
+    stopLiveVideo();
+  });
+
+  async function requestLiveKitViewerToken() {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/livekit-token`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: SUPABASE_KEY,
+        authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      body: JSON.stringify({ sessionId, role: 'viewer' }),
+    });
+    if (!res.ok) throw new Error('Live camera is unavailable');
+    return res.json();
+  }
+
+  async function startLiveVideo() {
+    if (livekitRoom || liveVideoDismissed) return;
+    attachLiveVideoToDriverMarker();
+    videoPip.classList.add('visible');
+    videoStatusEl.textContent = 'Connecting camera...';
+    videoStatusEl.classList.remove('hidden');
+
+    try {
+      const LiveKit = await import(LIVEKIT_CLIENT_URL);
+      const tokenData = await requestLiveKitViewerToken();
+      const room = new LiveKit.Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
+
+      room.on(LiveKit.RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === LiveKit.Track.Kind.Video) {
+          attachLiveVideo(track);
+        }
+      });
+      room.on(LiveKit.RoomEvent.TrackUnsubscribed, (track) => {
+        if (track === livekitVideoTrack) {
+          detachLiveVideo();
+        }
+      });
+      room.on(LiveKit.RoomEvent.Disconnected, () => {
+        detachLiveVideo();
+      });
+
+      await room.connect(tokenData.url, tokenData.token);
+      livekitRoom = room;
+
+      room.remoteParticipants.forEach((participant) => {
+        participant.trackPublications.forEach((publication) => {
+          if (publication.track?.kind === LiveKit.Track.Kind.Video) {
+            attachLiveVideo(publication.track);
+          }
+        });
+      });
+    } catch (_) {
+      videoStatusEl.textContent = 'Camera unavailable';
+      setTimeout(() => {
+        if (!livekitRoom && !livekitVideoTrack) videoPip.classList.remove('visible');
+      }, 3500);
+    }
+  }
+
+  function attachLiveVideo(track) {
+    livekitVideoTrack = track;
+    try {
+      attachLiveVideoToDriverMarker();
+      track.attach(liveVideoEl);
+      liveVideoEl.play?.().catch(() => {});
+      videoStatusEl.classList.add('hidden');
+      videoPip.classList.add('visible');
+    } catch (_) {}
+  }
+
+  function detachLiveVideo() {
+    if (livekitVideoTrack) {
+      try { livekitVideoTrack.detach(liveVideoEl); } catch (_) {}
+    }
+    livekitVideoTrack = null;
+    liveVideoEl.removeAttribute('src');
+    liveVideoEl.srcObject = null;
+    videoStatusEl.textContent = 'Waiting for camera...';
+    videoStatusEl.classList.remove('hidden');
+  }
+
+  function stopLiveVideo() {
+    const room = livekitRoom;
+    livekitRoom = null;
+    if (room) {
+      try { room.disconnect(); } catch (_) {}
+    }
+    detachLiveVideo();
+    setVideoExpanded(false);
+    videoPip.classList.remove('visible');
+  }
+
+  function attachLiveVideoToDriverMarker() {
+    if (!driverMarkerEl) return;
+    if (videoPip.classList.contains('expanded')) return;
+    if (videoPip.parentElement !== driverMarkerEl) {
+      driverMarkerEl.appendChild(videoPip);
+    }
+  }
+
+  function createMapMarkerElement(label, isClient = false) {
+    const el = document.createElement('div');
+    el.className = 'taxi-marker-wrapper';
+    el.innerHTML = `
+      <div class="taxi-ping${isClient ? ' client' : ''}"></div>
+      <div class="taxi-marker-bubble${isClient ? ' client' : ''}">${label}</div>
+      <div class="taxi-marker-arrow" style="${isClient ? 'border-top-color:var(--green);' : ''}"></div>
+    `;
+    return el;
+  }
+
+  function createMapMarker(label, isClient = false) {
+    const el = createMapMarkerElement(label, isClient);
+    return new maplibregl.Marker({ element: el, anchor: 'bottom' });
+  }
+
+  function hasValidPosition(lat, lng) {
+    return lat !== null &&
+      lng !== null &&
+      lat !== undefined &&
+      lng !== undefined &&
+      lat !== '' &&
+      lng !== '' &&
+      Number.isFinite(Number(lat)) &&
+      Number.isFinite(Number(lng));
+  }
+
+  function installMapLayers() {
+    const keepMapLabel = layerId => (
+      layerId.includes('label_city') ||
+      layerId.includes('label_state') ||
+      layerId.includes('label_country') ||
+      layerId.includes('highway-name-major')
+    );
+    const quietLayer = layer => {
+      const layerId = layer.id.toLowerCase();
+      if (layer.type === 'symbol') return !keepMapLabel(layerId);
+      return (
+        layerId.includes('building') ||
+        layerId.includes('railway') ||
+        layerId.includes('transit') ||
+        layerId.includes('airport') ||
+        layerId.includes('aeroway') ||
+        layerId.includes('landuse_residential')
+      );
+    };
+
+    mapInstance.getStyle().layers.forEach(layer => {
+      if (quietLayer(layer) && mapInstance.getLayer(layer.id)) {
+        mapInstance.setLayoutProperty(layer.id, 'visibility', 'none');
+      }
+    });
+
+    const emptyRoute = {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: [] },
+    };
+
+    if (!mapInstance.getSource('route')) {
+      mapInstance.addSource('route', { type: 'geojson', data: emptyRoute });
+      mapInstance.addLayer({
+        id: 'route-shadow',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.92 },
+      });
+      mapInstance.addLayer({
+        id: 'route-line',
+        type: 'line',
+        source: 'route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#003461',
+          'line-width': 4,
+          'line-opacity': 0.72,
+          'line-dasharray': [2, 2],
+        },
+      });
+    }
+
+    try {
+      mapInstance.setPaintProperty('water', 'fill-color', '#cfe6f3');
+      mapInstance.setPaintProperty('park', 'fill-color', '#dff0dc');
+    } catch (_) {}
+  }
+
+  if (!sessionId) {
+    loadingEl.style.display = 'none';
+    errorEl.classList.add('visible');
+  } else {
+    requestBrowserNotificationPermission();
+    const tid = setTimeout(() => {
+      if (loadingEl.style.display !== 'none') {
+        loadingEl.style.display = 'none';
+        document.getElementById('error-msg-text').textContent =
+          'Could not connect to the server. Check your internet connection.';
+        errorEl.classList.add('visible');
+      }
+    }, 10000);
+    init(tid).catch(err => {
+      clearTimeout(tid);
+      loadingEl.style.display = 'none';
+      document.getElementById('error-msg-text').textContent = 'Error: ' + err.message;
+      errorEl.classList.add('visible');
+    });
+  }
+
+  async function init(tid) {
+    // Init map
+    mapInstance = new maplibregl.Map({
+      container: 'map',
+      style: MAP_STYLE_URL,
+      center: [-56.1645, -34.9011],
+      zoom: MAP_CAMERA.zoom,
+      pitch: 0,
+      bearing: 0,
+      maxPitch: 0,
+      attributionControl: false,
+    });
+    mapInstance.addControl(
+      new maplibregl.AttributionControl({ compact: true }),
+      'bottom-right'
+    );
+    await new Promise(resolve => mapInstance.once('load', resolve));
+    installMapLayers();
+    updateCompass();
+    mapInstance.on('rotate', updateCompass);
+    mapInstance.on('rotateend', updateCompass);
+
+    // Disable follow when user drags map
+    ['dragstart', 'rotatestart', 'pitchstart', 'zoomstart'].forEach(eventName => {
+      mapInstance.on(eventName, () => {
+        followClient = false;
+        myLocBtn.classList.remove('active');
+      });
+    });
+
+    // Client GPS — watch position + write to Supabase
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        async pos => {
+          clientLat = pos.coords.latitude;
+          clientLng = pos.coords.longitude;
+          if (!hasValidPosition(clientLat, clientLng)) return;
+
+          // Write client position to Supabase for driver's 5 m alert
+          try {
+            await db.from('location_sessions').update({
+              client_latitude: clientLat,
+              client_longitude: clientLng,
+            }).eq('id', sessionId);
+          } catch(_) {}
+
+          if (!clientMarker) {
+            clientMarker = createMapMarker('ME', true)
+              .setLngLat([clientLng, clientLat])
+              .addTo(mapInstance);
+          } else {
+            clientMarker.setLngLat([clientLng, clientLat]);
+          }
+
+          // Pan to client only if follow mode active
+          if (followClient) {
+            mapInstance.easeTo({
+              center: [clientLng, clientLat],
+              zoom: MAP_CAMERA.focusZoom,
+              duration: 650,
+              pitch: 0,
+            });
+          }
+
+          updateDistance();
+          updateRoute();
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      );
+    }
+
+    // Load session
+    const { data, error } = await db
+      .from('location_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    clearTimeout(tid);
+
+    if (error || !data) {
+      loadingEl.style.display = 'none';
+      document.getElementById('error-msg-text').textContent =
+        "This link doesn't exist or has expired. Ask your driver for a new one.";
+      errorEl.classList.add('visible');
+      return;
+    }
+
+    if (!data.active) {
+      loadingEl.style.display = 'none';
+      showStopped();
+      return;
+    }
+
+    // Set driver info
+    const name  = data.driver_name  || 'Driver';
+    const phone = data.driver_phone || '';
+    driverPhone = phone;
+    document.getElementById('driver-name-el').textContent = name;
+    document.getElementById('status-text').textContent = 'On the way';
+
+    // Set call/sms buttons
+    if (phone) {
+      document.getElementById('btn-call').href = 'tel:' + phone;
+      document.getElementById('btn-sms').href  = 'sms:' + phone;
+      document.getElementById('stopped-call').href = 'tel:' + phone;
+      document.getElementById('stopped-sms').href  = 'sms:' + phone;
+    }
+
+    driverMarkerName = '🚕 ' + name;
+
+    loadingEl.style.display = 'none';
+    updateDriverPosition(data.latitude, data.longitude, data.updated_at, name);
+    if (data.video_enabled === true) {
+      liveVideoDismissed = false;
+      startLiveVideo();
+    }
+
+    // Realtime subscription
+    db.channel('session-' + sessionId)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public',
+        table: 'location_sessions', filter: `id=eq.${sessionId}`,
+      }, payload => {
+        const row = payload.new;
+        if (!row.active) { showStopped(); return; }
+        if (row.video_enabled === true && !livekitRoom) startLiveVideo();
+        if (row.video_enabled !== true) {
+          liveVideoDismissed = false;
+          if (livekitRoom) stopLiveVideo();
+        }
+        updateDriverPosition(row.latitude, row.longitude, row.updated_at, name);
+      })
+      .subscribe();
+  }
+
+  let driverMarkerName = '🚕 Driver';
+
+  function updateDriverPosition(lat, lng, updatedAt, name) {
+    if (!hasValidPosition(lat, lng)) return;
+    lat = Number(lat);
+    lng = Number(lng);
+    driverLat = lat; driverLng = lng;
+    driverLocBtn.classList.add('ready');
+    if (!driverMarker) {
+      driverMarkerEl = createMapMarkerElement(driverMarkerName);
+      attachLiveVideoToDriverMarker();
+      driverMarker = new maplibregl.Marker({
+        element: driverMarkerEl,
+        anchor: 'bottom',
+      })
+        .setLngLat([lng, lat])
+        .addTo(mapInstance);
+      // Only center on first load
+      mapInstance.easeTo({
+        center: [lng, lat],
+        zoom: MAP_CAMERA.zoom,
+        pitch: 0,
+        duration: 800,
+      });
+    } else {
+      driverMarker.setLngLat([lng, lat]);
+    }
+    // Do NOT auto-pan on position updates — user controls the map
+    if (updatedAt) {
+      const d = new Date(updatedAt);
+      document.getElementById('last-update').textContent =
+        d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    updateDistance();
+    updateRoute();
+  }
+
+  function updateDistance() {
+    if (driverLat === null || clientLat === null) return;
+    const dist = haversineM(clientLat, clientLng, driverLat, driverLng);
+    const formattedDistance = formatDistance(dist);
+
+    distValue.textContent = formattedDistance.value;
+    distUnit.textContent  = formattedDistance.unit;
+
+    distValue.classList.toggle('close',    dist <= 500 && dist > 100);
+    distValue.classList.toggle('arrived',  dist <= 100);
+
+    const approaching = prevDist !== null && dist < prevDist;
+    if (dist <= 100 && approaching && !notifSent) {
+      notifSent = true;
+      bannerEl.classList.add('visible');
+      bannerDist.textContent = `Driver ${formatDistanceText(dist)} away`;
+      bottomCard.classList.add('alert');
+      if (cardCollapsed) expandCard();
+      playChime();
+      showBrowserNotification(
+        "Driver nearby",
+        `Driver is ${formatDistanceText(dist)} away.`
+      );
+    }
+    if (dist <= 100) {
+      bannerEl.classList.add('visible');
+      bannerDist.textContent = `Driver ${formatDistanceText(dist)} away`;
+    }
+
+    prevDist = dist;
+  }
+
+  function updateRoute() {
+    if (driverLat === null || clientLat === null) return;
+    const route = mapInstance.getSource('route');
+    if (!route) return;
+    route.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: [[clientLng, clientLat], [driverLng, driverLat]],
+      },
+    });
+    // Remove fitBounds — map should not jump automatically
+  }
+
+  function haversineM(lat1, lon1, lat2, lon2) {
+    const R  = 6371000;
+    const dL = ((lat2 - lat1) * Math.PI) / 180;
+    const dO = ((lon2 - lon1) * Math.PI) / 180;
+    const a  = Math.sin(dL/2)**2 +
+               Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+               Math.sin(dO/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function showStopped() {
+    document.getElementById('live-badge').style.display = 'none';
+    stopLiveVideo();
+    stoppedEl.classList.add('visible');
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Disable parent .htaccess rules for this folder
+Options -Indexes
+RewriteEngine Off
+
+# Allow direct access to HTML files
+<FilesMatch "\.(html|htm)$">
+    Require all granted
+</FilesMatch>
+
+# Disable ModSecurity if enabled
+<IfModule mod_security2.c>
+    SecRuleEngine Off
+</IfModule>

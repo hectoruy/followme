@@ -1,0 +1,17 @@
+API.txt
+.env
+.env.*
+.rollback/
+supabase/.temp/
+
+# IDE / editors
+.idea/
+.vscode/
+
+# Agent / tooling local state
+.claude/
+.codex/
+
+# OS / misc
+*.lnk
+node_modules/

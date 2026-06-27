@@ -1,0 +1,8 @@
+project_id = "where-is-my-driver"
+
+[functions.cliente]
+verify_jwt = false
+static_files = [ "./functions/cliente/cliente.html" ]
+
+[functions.livekit-token]
+verify_jwt = false
