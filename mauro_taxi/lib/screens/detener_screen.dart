@@ -476,7 +476,8 @@ class _DetenerScreenState extends State<DetenerScreen>
               ),
             ),
             Center(
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // TRIP ACTIVE badge
@@ -778,6 +779,7 @@ class _DetenerScreenState extends State<DetenerScreen>
                     ),
                   ),
                 ],
+              ),
               ),
             ),
             if (_liveVideoEnabled && _previewVisible && _previewExpanded)
