@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -283,9 +284,27 @@ class _IniciarScreenState extends State<IniciarScreen>
     }
   }
 
-  Future<bool> _startLiveVideo(String sessionId, String driverSecret) async {
-    final status = await Permission.camera.request();
-    if (!status.isGranted) return false;
+  Future<bool> _requestLiveVideoPermissions() async {
+    final cameraStatus = await Permission.camera.request();
+    if (!cameraStatus.isGranted) return false;
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      final microphoneStatus = await Permission.microphone.request();
+      if (!microphoneStatus.isGranted) return false;
+    }
+
+    return true;
+  }
+
+  Future<bool> _startLiveVideo(
+    String sessionId,
+    String driverSecret, {
+    bool ensurePermissions = true,
+  }) async {
+    if (ensurePermissions) {
+      final permissionsGranted = await _requestLiveVideoPermissions();
+      if (!permissionsGranted) return false;
+    }
 
     try {
       await _liveVideoService.start(
@@ -305,8 +324,8 @@ class _IniciarScreenState extends State<IniciarScreen>
 
   Future<bool> _setLiveVideoEnabled(String sessionId, bool enabled) async {
     if (enabled) {
-      final status = await Permission.camera.request();
-      if (!status.isGranted) return false;
+      final permissionsGranted = await _requestLiveVideoPermissions();
+      if (!permissionsGranted) return false;
 
       final driverSecret = await _ensureActiveSessionDriverSecret();
       try {
@@ -315,7 +334,11 @@ class _IniciarScreenState extends State<IniciarScreen>
           'updated_at': DateTime.now().toIso8601String(),
         }).eq('id', sessionId);
 
-        final started = await _startLiveVideo(sessionId, driverSecret);
+        final started = await _startLiveVideo(
+          sessionId,
+          driverSecret,
+          ensurePermissions: false,
+        );
         if (!started) {
           await Supabase.instance.client.from('location_sessions').update({
             'video_enabled': false,

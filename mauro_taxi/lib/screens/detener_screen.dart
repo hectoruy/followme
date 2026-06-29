@@ -122,7 +122,7 @@ class _DetenerScreenState extends State<DetenerScreen>
         SnackBar(
           content: Text(
             nextValue
-                ? 'Camera could not start. Check camera permission.'
+                ? 'Camera could not start. Check camera and microphone permissions.'
                 : 'Camera could not stop.',
           ),
           backgroundColor: const Color(0xFFBA1A1A),

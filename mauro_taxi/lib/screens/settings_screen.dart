@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -175,6 +176,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const SizedBox(height: 48),
+
+              // Privacy Policy link (required by Apple App Store guideline 5.1.1)
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://hectoruy.github.io/followme/privacy-policy.html'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.privacy_tip_outlined, size: 16),
+                  label: const Text('Privacy Policy'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF003461),
+                    textStyle: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // Save button
               SizedBox(

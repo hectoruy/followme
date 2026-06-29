@@ -44,19 +44,19 @@ post_install do |installer|
 
     target.build_configurations.each do |config|
       # permission_handler: compile in ONLY the permissions FollowMe uses
-      # (location, camera, notifications) and explicitly disable the rest so
+      # (location, camera, microphone, notifications) and explicitly disable the rest so
       # App Store review doesn't flag unused permission APIs.
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'PERMISSION_LOCATION=1',
         'PERMISSION_LOCATION_WHENINUSE=1',
         'PERMISSION_CAMERA=1',
+        'PERMISSION_MICROPHONE=1',
         'PERMISSION_NOTIFICATIONS=1',
         'PERMISSION_EVENTS=0',
         'PERMISSION_EVENTS_FULL_ACCESS=0',
         'PERMISSION_REMINDERS=0',
         'PERMISSION_CONTACTS=0',
-        'PERMISSION_MICROPHONE=0',
         'PERMISSION_SPEECH_RECOGNIZER=0',
         'PERMISSION_PHOTOS=0',
         'PERMISSION_MEDIA_LIBRARY=0',
