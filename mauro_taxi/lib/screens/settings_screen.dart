@@ -181,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Center(
                 child: TextButton.icon(
                   onPressed: () => launchUrl(
-                    Uri.parse('https://hectoruy.github.io/followme/privacy-policy.html'),
+                    Uri.parse('https://project-jcd2n.vercel.app/privacy-policy'),
                     mode: LaunchMode.externalApplication,
                   ),
                   icon: const Icon(Icons.privacy_tip_outlined, size: 16),
