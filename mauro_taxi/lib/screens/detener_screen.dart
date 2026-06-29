@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart' as livekit;
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -35,6 +36,7 @@ class DetenerScreen extends StatefulWidget {
 class _DetenerScreenState extends State<DetenerScreen>
     with TickerProviderStateMixin {
   bool _stopping = false;
+  bool _linkCopied = false;
   late bool _liveVideoEnabled;
   bool _videoBusy = false;
   bool _switchingCamera = false;
@@ -97,6 +99,14 @@ class _DetenerScreenState extends State<DetenerScreen>
         subject: "Track my location — Where Is My Driver",
       );
     } catch (_) {}
+  }
+
+  Future<void> _copyLink() async {
+    await Clipboard.setData(ClipboardData(text: widget.shareLink));
+    HapticFeedback.lightImpact();
+    setState(() => _linkCopied = true);
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _linkCopied = false);
   }
 
   Future<void> _toggleLiveVideo() async {
@@ -727,55 +737,138 @@ class _DetenerScreenState extends State<DetenerScreen>
 
                   const SizedBox(height: 18),
 
-                  // Share link again button
-                  GestureDetector(
-                    onTap: _shareLink,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 40),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 14, horizontal: 24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                const Color(0xFF003461).withValues(alpha: 0.10),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
+                  // Share / Copy link row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Row(
+                      children: [
+                        // Share button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _shareLink,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF003461)
+                                        .withValues(alpha: 0.10),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: const Color(0xFF003461)
+                                      .withValues(alpha: 0.12),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF003461)
+                                          .withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.share_rounded,
+                                        color: Color(0xFF003461), size: 18),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Share',
+                                    style: TextStyle(
+                                      color: Color(0xFF003461),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ],
-                        border: Border.all(
-                          color:
-                              const Color(0xFF003461).withValues(alpha: 0.12),
-                          width: 1.5,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF003461)
-                                  .withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
+                        const SizedBox(width: 12),
+                        // Copy link button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _copyLink,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: _linkCopied
+                                    ? const Color(0xFF059669)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_linkCopied
+                                            ? const Color(0xFF059669)
+                                            : const Color(0xFF003461))
+                                        .withValues(alpha: 0.15),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                border: Border.all(
+                                  color: _linkCopied
+                                      ? const Color(0xFF059669)
+                                      : const Color(0xFF003461)
+                                          .withValues(alpha: 0.12),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: _linkCopied
+                                          ? Colors.white.withValues(alpha: 0.2)
+                                          : const Color(0xFF003461)
+                                              .withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      _linkCopied
+                                          ? Icons.check_rounded
+                                          : Icons.copy_rounded,
+                                      color: _linkCopied
+                                          ? Colors.white
+                                          : const Color(0xFF003461),
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 200),
+                                    style: TextStyle(
+                                      color: _linkCopied
+                                          ? Colors.white
+                                          : const Color(0xFF003461),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                    ),
+                                    child: Text(
+                                        _linkCopied ? 'Copied!' : 'Copy Link'),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: const Icon(Icons.share_rounded,
-                                color: Color(0xFF003461), size: 18),
                           ),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'Share Link Again',
-                            style: TextStyle(
-                              color: Color(0xFF003461),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
