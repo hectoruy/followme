@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +39,9 @@ class _DetenerScreenState extends State<DetenerScreen>
     with TickerProviderStateMixin {
   bool _stopping = false;
   bool _linkCopied = false;
+  final DateTime _startTime = DateTime.now();
+  Duration _elapsed = Duration.zero;
+  Timer? _elapsedTimer;
   late bool _liveVideoEnabled;
   bool _videoBusy = false;
   bool _switchingCamera = false;
@@ -66,6 +71,23 @@ class _DetenerScreenState extends State<DetenerScreen>
     _glowAnimation = Tween<double>(begin: 0.4, end: 0.8).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _elapsed = DateTime.now().difference(_startTime));
+      }
+    });
+  }
+
+  String _formatElapsed(Duration d) {
+    final hours = d.inHours;
+    final minutes = d.inMinutes.remainder(60);
+    final seconds = d.inSeconds.remainder(60);
+    final mm = minutes.toString().padLeft(2, '0');
+    final ss = seconds.toString().padLeft(2, '0');
+    if (hours > 0) {
+      return '$hours:$mm:$ss';
+    }
+    return '$mm:$ss';
   }
 
   @override
@@ -86,6 +108,7 @@ class _DetenerScreenState extends State<DetenerScreen>
   void dispose() {
     _pulseController.dispose();
     _glowController.dispose();
+    _elapsedTimer?.cancel();
     // NOTE: we do NOT mark the session inactive here.
     // Session lifecycle is managed by IniciarScreen via SharedPreferences.
     // When the app is reopened, _checkForActiveSession() will restore it.
@@ -523,7 +546,29 @@ class _DetenerScreenState extends State<DetenerScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 12),
+
+                  // Elapsed time
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.timer_outlined,
+                          size: 16,
+                          color: const Color(0xFF424750).withValues(alpha: 0.6)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Sharing for ${_formatElapsed(_elapsed)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF424750).withValues(alpha: 0.7),
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 36),
 
                   // Stop button
                   SizedBox(
