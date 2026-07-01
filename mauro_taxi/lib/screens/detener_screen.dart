@@ -189,6 +189,69 @@ class _DetenerScreenState extends State<DetenerScreen>
 
   Future<void> _stopSharing() async {
     if (_stopping) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFBA1A1A).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.stop_circle_outlined,
+                  color: Color(0xFFBA1A1A), size: 24),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Text(
+                'Stop sharing?',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                    color: Color(0xFF191C1E)),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Your passengers will no longer be able to see your location, and the tracking link will stop working.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF424750), height: 1.5),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text('Keep sharing',
+                style: TextStyle(
+                    color: Color(0xFF727781), fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBA1A1A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Stop',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
     setState(() => _stopping = true);
 
     try {
