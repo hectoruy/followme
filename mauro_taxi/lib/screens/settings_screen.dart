@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -16,11 +17,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _phoneController = TextEditingController();
   bool _loading = false;
   bool _saved = false;
+  String _version = '';
+
+  static const _privacyUrl = 'https://project-jcd2n.vercel.app/privacy-policy';
+  static const _contactEmail = 'freire.hector@gmail.com';
 
   @override
   void initState() {
     super.initState();
     _loadCurrent();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _version = '${info.version} (${info.buildNumber})');
+    }
   }
 
   @override
@@ -49,6 +62,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
     HapticFeedback.mediumImpact();
     await Future.delayed(const Duration(milliseconds: 500));
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _openPrivacy() => launchUrl(
+        Uri.parse(_privacyUrl),
+        mode: LaunchMode.externalApplication,
+      );
+
+  Future<void> _openEmail() => launchUrl(
+        Uri(scheme: 'mailto', path: _contactEmail),
+      );
+
+  Widget _aboutRow({
+    required IconData icon,
+    required String label,
+    String? value,
+    VoidCallback? onTap,
+    bool showChevron = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFF003461)),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF191C1E)),
+            ),
+            const Spacer(),
+            if (value != null)
+              Text(
+                value,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF727781)),
+              ),
+            if (showChevron) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right,
+                  size: 20, color: Color(0xFF9AA0A6)),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   InputDecoration _dec({required String hint, required IconData icon}) =>
@@ -175,24 +237,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
 
-              // Privacy Policy link (required by Apple App Store guideline 5.1.1)
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => launchUrl(
-                    Uri.parse('https://project-jcd2n.vercel.app/privacy-policy'),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  icon: const Icon(Icons.privacy_tip_outlined, size: 16),
-                  label: const Text('Privacy Policy'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF003461),
-                    textStyle: const TextStyle(fontSize: 13),
-                  ),
+              // About section
+              const Padding(
+                padding: EdgeInsets.only(left: 4, bottom: 8),
+                child: Text('ABOUT',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: Color(0xFF9AA0A6))),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFDDE3EA)),
+                ),
+                child: Column(
+                  children: [
+                    _aboutRow(
+                      icon: Icons.info_outline,
+                      label: 'Version',
+                      value: _version.isEmpty ? '—' : _version,
+                    ),
+                    const Divider(height: 1, color: Color(0xFFEEF1F4)),
+                    // Privacy Policy (required by Apple App Store guideline 5.1.1)
+                    _aboutRow(
+                      icon: Icons.privacy_tip_outlined,
+                      label: 'Privacy Policy',
+                      onTap: _openPrivacy,
+                      showChevron: true,
+                    ),
+                    const Divider(height: 1, color: Color(0xFFEEF1F4)),
+                    _aboutRow(
+                      icon: Icons.mail_outline,
+                      label: 'Contact',
+                      value: _contactEmail,
+                      onTap: _openEmail,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
               // Save button
               SizedBox(

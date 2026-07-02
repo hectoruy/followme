@@ -1,7 +1,7 @@
 name: mauro_taxi
 description: Where's My Driver — Real-time driver tracking app
 publish_to: 'none'
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -21,6 +21,7 @@ dependencies:
   share_plus: ^10.1.4
   flutter_foreground_task: ^8.0.0
   livekit_client: ^2.6.4
+  package_info_plus: ^8.1.1
 
 dev_dependencies:
   flutter_test:
